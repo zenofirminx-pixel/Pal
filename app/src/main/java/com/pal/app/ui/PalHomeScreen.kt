@@ -57,17 +57,25 @@ fun PalHomeScreen() {
         Column(Modifier.fillMaxSize()) {
             TopBar()
 
-            when (selectedTab) {
-                0 -> PalRealFeedContent()
-                1 -> MessagesScreen(
-                    onOpenPalAi = {
-                        previousTab = 1
-                        selectedTab = 4
-                    }
-                )
-                2 -> NotificationsScreen()
-                3 -> SearchScreen()
-                4 -> PalAiScreen(onBack = { selectedTab = previousTab })
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                when (selectedTab) {
+                    0 -> PalRealFeedContent()
+                    1 -> MessagesScreen(
+                        onOpenPalAi = {
+                            previousTab = 1
+                            selectedTab = 4
+                        }
+                    )
+                    2 -> NotificationsScreen()
+                    3 -> SearchScreen()
+                    4 -> PalAiScreen(
+                        onBack = { selectedTab = previousTab }
+                    )
+                }
             }
 
             BottomBar(selectedTab) { tab ->
@@ -120,56 +128,53 @@ private fun PalMark(modifier: Modifier) {
 private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
     val items = listOf(
         Triple(0, "Accueil", Icons.Default.Home),
-        Triple(1, "Message", Icons.Default.ChatBubbleOutline),
+        Triple(1, "Messages", Icons.Default.ChatBubbleOutline),
         Triple(4, "Pal AI", Icons.Default.AutoAwesome),
         Triple(2, "Notifications", Icons.Default.NotificationsNone),
         Triple(3, "Recherche", Icons.Default.Search)
     )
 
-    val visibleItems = if (selected == 1) {
-        items.filter { it.first != 4 }
-    } else {
-        items
-    }
-
-    Row(
-        Modifier
+    Column(
+        modifier = Modifier
             .fillMaxWidth()
             .background(PalBlack)
-            .navigationBarsPadding()
-            .padding(top = 7.dp, bottom = 5.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        visibleItems.forEach { (index, label, icon) ->
-            val active = selected == index
+        HorizontalDivider(color = Color(0xFF20242B), thickness = 1.dp)
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onSelect(index) }
-                    .padding(vertical = 3.dp)
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = label,
-                    tint = if (active) PalBlue else Color.White,
-                    modifier = Modifier.size(27.dp)
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    label,
-                    color = if (active) PalBlue else Color.White,
-                    style = MaterialTheme.typography.labelMedium
-                )
-                Spacer(Modifier.height(3.dp))
-                Box(
-                    Modifier
-                        .width(42.dp)
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(if (active) PalBlue else PalBlack)
-                )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(66.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { (index, label, icon) ->
+                val active = selected == index
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onSelect(index) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = label,
+                        tint = if (active) PalBlue else Color.White,
+                        modifier = Modifier.size(25.dp)
+                    )
+
+                    Spacer(Modifier.height(3.dp))
+
+                    Text(
+                        label,
+                        color = if (active) PalBlue else Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
