@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Favorite
@@ -48,22 +49,36 @@ private val Muted = Color(0xFF8C929D)
 
 @Composable
 fun PalHomeScreen() {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var liked by remember { mutableStateOf(false) }
+    var previousTab by remember { mutableIntStateOf(0) }
+
     Surface(color = PalBlack, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             TopBar()
+
             when (selectedTab) {
-                0 -> FeedContent(liked)
-                1 -> SimplePlaceholder("Message", "Tes conversations apparaîtront ici.", Icons.Default.ChatBubbleOutline)
-                2 -> SimplePlaceholder("Notifications", "Tu retrouveras ici les nouveautés de ton réseau.", Icons.Default.NotificationsNone)
-                else -> SimplePlaceholder("Recherche", "Recherche des personnes sur Pal.", Icons.Default.Search)
+                0 -> PalRealFeedContent()
+                1 -> MessagesScreen(
+                    onOpenPalAi = {
+                        previousTab = 1
+                        selectedTab = 4
+                    }
+                )
+                2 -> NotificationsScreen()
+                3 -> SearchScreen()
+                4 -> PalAiScreen(onBack = { selectedTab = previousTab })
             }
-            BottomBar(selectedTab) { selectedTab = it }
+
+            BottomBar(selectedTab) { tab ->
+                if (tab == 4) {
+                    previousTab = selectedTab
+                }
+                selectedTab = tab
+            }
         }
     }
 }
-
 
 @Composable
 private fun TopBar() {
@@ -77,181 +92,6 @@ private fun TopBar() {
         Text(" Messenger", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.weight(1f))
         Icon(Icons.Default.Menu, contentDescription = "Paramètres", tint = Color.White, modifier = Modifier.size(30.dp).clickable { })
-    }
-}
-
-
-@Composable
-private fun FeedContent(liked: Boolean) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(13.dp)
-    ) {
-        item { StoriesRow() }
-        item { ComposerCard() }
-        item { PostCard("Firmin", "@firmin", "Il y a 15 min", "Aujourd'hui est une nouvelle occasion de faire mieux. ✨", 24, 8, true) }
-        item { PostCard("Sarah", "@sarah_m", "Il y a 1 h", "La vie est plus belle quand on croit en soi. 💙", 37, 12, false) }
-        item { PostCard("Kevin", "@kevin_01", "Il y a 2 h", "Un petit moment de calme.", 16, 4, false) }
-    }
-}
-
-
-@Composable
-private fun StoriesRow() {
-    val storyNames = listOf("Ajouter", "Sarah", "Kevin", "Maria", "Patrick", "Jean")
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 15.dp, end = 10.dp, top = 4.dp)) {
-        storyNames.forEachIndexed { index, name ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp).padding(end = 7.dp)) {
-                Box(Modifier.size(67.dp), contentAlignment = Alignment.Center) {
-                    if (index == 0) {
-                        Box(Modifier.size(65.dp).border(2.dp, Color(0xFF222832), CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, contentDescription = "Ajouter une story", tint = PalBlue, modifier = Modifier.size(30.dp))
-                        }
-                    } else {
-                        Box(Modifier.size(66.dp).border(3.dp, PalBlue, CircleShape).padding(4.dp).clip(CircleShape)) {
-                            Avatar(name, index, Modifier.fillMaxSize())
-                        }
-                    }
-                    if (index == 0) Box(Modifier.align(Alignment.BottomEnd).size(23.dp).clip(CircleShape).background(PalBlue), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
-                    }
-                }
-                Text(if (index == 0) "Ajouter une story" else name, color = Color.White, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun ComposerCard() {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(25.dp)).background(Card).padding(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar("Firmin", 0, Modifier.size(48.dp))
-            Spacer(Modifier.width(10.dp))
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(30.dp)).background(Color(0xFF10141B)).border(1.dp, Color(0xFF1E2631), RoundedCornerShape(30.dp)).clickable { }.padding(horizontal = 16.dp, vertical = 16.dp)) {
-                Text("Ta pensée du moment ?", color = Muted, style = MaterialTheme.typography.bodyLarge)
-            }
-        }
-        Spacer(Modifier.height(13.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            ComposerAction(Icons.Default.Image, "Photo")
-            VerticalDivider(Modifier.height(25.dp), color = Color(0xFF28303B))
-            ComposerAction(Icons.Default.VideoCall, "Vidéo")
-            VerticalDivider(Modifier.height(25.dp), color = Color(0xFF28303B))
-            ComposerAction(Icons.Default.Edit, "Texte")
-            Button(onClick = {}, shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 13.dp, vertical = 10.dp), colors = ButtonDefaults.buttonColors(containerColor = PalBlue)) {
-                Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("Publier", fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun ComposerAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }.padding(horizontal = 2.dp)) {
-        Icon(icon, contentDescription = label, tint = PalBlue, modifier = Modifier.size(21.dp))
-        Spacer(Modifier.width(5.dp))
-        Text(label, color = Color.White, style = MaterialTheme.typography.labelLarge)
-    }
-}
-
-
-@Composable
-private fun PostCard(name: String, handle: String, time: String, body: String, likes: Int, comments: Int, cityImage: Boolean) {
-    var isLiked by remember { mutableStateOf(name == "Firmin") }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(26.dp)).background(Card).padding(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar(name, name.hashCode().let { kotlin.math.abs(it % 5) }, Modifier.size(58.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(name, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    if (name == "Firmin" || name == "Sarah") {
-                        Spacer(Modifier.width(5.dp)); VerifiedDot()
-                    }
-                }
-                Text("$handle · $time", color = Muted, style = MaterialTheme.typography.bodyMedium)
-            }
-            Icon(Icons.Default.Menu, contentDescription = "Options", tint = Muted, modifier = Modifier.clickable { }.size(23.dp))
-        }
-        Text(body, color = Color.White, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 68.dp, top = 12.dp, bottom = 12.dp))
-        if (cityImage) CityImage(Modifier.fillMaxWidth().height(220.dp)) else BlueRoseStyle(Modifier.fillMaxWidth().height(140.dp))
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { isLiked = !isLiked }) {
-                Icon(if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "J'aime", tint = if (isLiked) PalBlue else Muted, modifier = Modifier.size(28.dp))
-                Text("${likes + (if (isLiked && name != "Firmin") 1 else 0)}", color = Color.White, modifier = Modifier.padding(start = 6.dp))
-            }
-            Spacer(Modifier.width(26.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }) {
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = "Commenter", tint = Muted, modifier = Modifier.size(26.dp))
-                Text("$comments", color = Color.White, modifier = Modifier.padding(start = 6.dp))
-            }
-            Spacer(Modifier.width(24.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }) {
-                Icon(Icons.Default.Send, contentDescription = "Partager", tint = Muted, modifier = Modifier.size(24.dp))
-                Text("Partager", color = Color.White, modifier = Modifier.padding(start = 6.dp))
-            }
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.BookmarkBorder, contentDescription = "Enregistrer", tint = Muted, modifier = Modifier.size(25.dp).clickable { })
-        }
-    }
-}
-
-
-@Composable
-private fun Avatar(label: String, seed: Int, modifier: Modifier = Modifier) {
-    val colors = listOf(Color(0xFF174F9C), Color(0xFF164A69), Color(0xFF32465B), Color(0xFF36518A), Color(0xFF343B59))
-    Box(modifier.clip(CircleShape).background(Brush.linearGradient(listOf(colors[kotlin.math.abs(seed) % colors.size], Color(0xFF11151C)))), contentAlignment = Alignment.Center) {
-        Text(label.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-    }
-}
-
-
-@Composable
-private fun VerifiedDot() {
-    Box(Modifier.size(17.dp).clip(CircleShape).background(PalBlue), contentAlignment = Alignment.Center) {
-        Text("✓", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-    }
-}
-
-
-@Composable
-private fun CityImage(modifier: Modifier) {
-    Canvas(modifier.clip(RoundedCornerShape(20.dp))) {
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF053B8B), Color(0xFF020A24), Color(0xFF01030A))))
-        drawCircle(Color(0xFF0B57C8).copy(alpha = .22f), radius = size.width * .35f, center = Offset(size.width * .76f, size.height * .18f))
-        val buildings = listOf(.16f to .55f, .27f to .44f, .38f to .65f, .48f to .35f, .59f to .50f, .70f to .39f, .80f to .62f, .90f to .43f)
-        buildings.forEachIndexed { i, (x, h) ->
-            val w = size.width * .105f
-            val bh = size.height * h
-            drawRect(Color(0xFF030918), topLeft = Offset(size.width*x-w/2, size.height-bh), size = Size(w,bh))
-            for (row in 0..5) for (col in 0..2) {
-                val wx = size.width*x-w/2 + w*.18f + col*w*.25f
-                val wy = size.height-bh + row*bh*.13f + 6f
-                if (wy < size.height-bh+bh*.75f) drawRect(Color(0xFF1E80FF).copy(alpha=.35f), Offset(wx,wy), Size(w*.09f, bh*.035f))
-            }
-        }
-        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF01040C)), startY=size.height*.75f, endY=size.height), topLeft=Offset(0f,size.height*.7f), size=Size(size.width,size.height*.3f))
-    }
-}
-
-
-@Composable
-private fun BlueRoseStyle(modifier: Modifier) {
-    Canvas(modifier.clip(RoundedCornerShape(20.dp))) {
-        drawRect(Brush.linearGradient(listOf(Color(0xFF010816), Color(0xFF043B91), Color(0xFF01050E))))
-        val center = Offset(size.width*.5f, size.height*.5f)
-        for (i in 0..12) {
-            val radius = size.minDimension * (.08f + i*.026f)
-            drawOval(Color(0xFF1682FF).copy(alpha=.14f + i*.012f), topLeft=Offset(center.x-radius, center.y-radius*.8f), size=Size(radius*2, radius*1.6f), style=Stroke(width=2.5f))
-        }
-        drawCircle(Color(0xFF4AA4FF).copy(alpha=.3f), size.minDimension*.12f, center)
     }
 }
 
@@ -278,32 +118,59 @@ private fun PalMark(modifier: Modifier) {
 
 @Composable
 private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
-    val labels = listOf("Accueil", "Message", "Notifications", "Recherche")
-    val icons = listOf(Icons.Default.Home, Icons.Default.ChatBubbleOutline, Icons.Default.NotificationsNone, Icons.Default.Search)
-    Row(Modifier.fillMaxWidth().background(PalBlack).navigationBarsPadding().padding(top = 7.dp, bottom = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-        labels.forEachIndexed { index, label ->
-            val active = selected == index
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f).clickable { onSelect(index) }.padding(vertical = 3.dp)) {
-                Icon(icons[index], contentDescription = label, tint = if (active) PalBlue else Color.White, modifier = Modifier.size(27.dp))
-                Spacer(Modifier.height(4.dp))
-                Text(label, color = if (active) PalBlue else Color.White, style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(3.dp))
-                Box(Modifier.width(42.dp).height(3.dp).clip(RoundedCornerShape(3.dp)).background(if (active) PalBlue else PalBlack))
-            }
-        }
+    val items = listOf(
+        Triple(0, "Accueil", Icons.Default.Home),
+        Triple(1, "Message", Icons.Default.ChatBubbleOutline),
+        Triple(4, "Pal AI", Icons.Default.AutoAwesome),
+        Triple(2, "Notifications", Icons.Default.NotificationsNone),
+        Triple(3, "Recherche", Icons.Default.Search)
+    )
+
+    val visibleItems = if (selected == 1) {
+        items.filter { it.first != 4 }
+    } else {
+        items
     }
-}
 
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(PalBlack)
+            .navigationBarsPadding()
+            .padding(top = 7.dp, bottom = 5.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        visibleItems.forEach { (index, label, icon) ->
+            val active = selected == index
 
-@Composable
-private fun SimplePlaceholder(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = PalBlue, modifier = Modifier.size(56.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(5.dp))
-            Text(subtitle, color = Muted)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 3.dp)
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    tint = if (active) PalBlue else Color.White,
+                    modifier = Modifier.size(27.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    label,
+                    color = if (active) PalBlue else Color.White,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(3.dp))
+                Box(
+                    Modifier
+                        .width(42.dp)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (active) PalBlue else PalBlack)
+                )
+            }
         }
     }
 }
