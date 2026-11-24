@@ -84,7 +84,7 @@ private fun TopBar() {
 @Composable
 private fun FeedContent(liked: Boolean) {
     LazyColumn(
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
@@ -297,7 +297,7 @@ private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 private fun SimplePlaceholder(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, contentDescription = null, tint = PalBlue, modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(12.dp))
