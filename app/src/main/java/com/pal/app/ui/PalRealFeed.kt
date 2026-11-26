@@ -1,5 +1,19 @@
 package com.pal.app.ui
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -37,8 +51,63 @@ fun PalRealFeedContent() {
     var postText by remember { mutableStateOf("") }
     var publishing by remember { mutableStateOf(false) }
     var publishError by remember { mutableStateOf<String?>(null) }
+    var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var photoBase64 by remember { mutableStateOf<String?>(null) }
+    var selectingPhoto by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
+
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                selectingPhoto = true
+                publishError = null
+                try {
+                    val bitmap = withContext(Dispatchers.IO) {
+                        val bounds = BitmapFactory.Options().apply {
+                            inJustDecodeBounds = true
+                        }
+
+                        context.contentResolver.openInputStream(uri)?.use {
+                            BitmapFactory.decodeStream(it, null, bounds)
+                        }
+
+                        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                            throw Exception("Image illisible.")
+                        }
+
+                        var sampleSize = 1
+                        while (
+                            bounds.outWidth / sampleSize > 1920 ||
+                            bounds.outHeight / sampleSize > 1920
+                        ) {
+                            sampleSize *= 2
+                        }
+
+                        val options = BitmapFactory.Options().apply {
+                            inSampleSize = sampleSize
+                        }
+
+                        context.contentResolver.openInputStream(uri)?.use {
+                            BitmapFactory.decodeStream(it, null, options)
+                        } ?: throw Exception("Impossible de lire cette image.")
+                    }
+                    val encoded = withContext(Dispatchers.Default) {
+                        compressPostPhoto(bitmap)
+                    }
+                    selectedBitmap = bitmap
+                    photoBase64 = encoded
+                } catch (e: Exception) {
+                    publishError = e.message ?: "Impossible de charger cette image."
+                } finally {
+                    selectingPhoto = false
+                }
+            }
+        }
+    }
 
     suspend fun loadFeed() {
         loading = true
@@ -130,6 +199,41 @@ fun PalRealFeedContent() {
                     enabled = !publishing
                 )
 
+                OutlinedButton(
+                    onClick = { photoPicker.launch("image/*") },
+                    enabled = !publishing && !selectingPhoto,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (selectingPhoto) "Chargement..."
+                        else if (photoBase64 != null) "Changer la photo"
+                        else "Ajouter une photo",
+                        color = Color.White
+                    )
+                }
+
+                selectedBitmap?.let { bitmap ->
+                    Spacer(Modifier.height(10.dp))
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Aperçu de la publication",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                    TextButton(
+                        onClick = {
+                            selectedBitmap = null
+                            photoBase64 = null
+                        },
+                        enabled = !publishing
+                    ) {
+                        Text("Retirer la photo", color = FeedMuted)
+                    }
+                }
+
                 publishError?.let {
                     Text(it, color = Color(0xFFFF6B6B))
                 }
@@ -143,10 +247,18 @@ fun PalRealFeedContent() {
                             publishError = null
                             try {
                                 val response =
-                                    SocialRepository.createPost(postText.trim())
+                                    SocialRepository.createPost(
+                                        text = postText.trim(),
+                                        photoData = photoBase64?.let {
+                                            "data:image/webp;base64,$it"
+                                        },
+                                        photoMimeType = photoBase64?.let { "image/webp" }
+                                    )
 
                                 if (response.optBoolean("success")) {
                                     postText = ""
+                                    selectedBitmap = null
+                                    photoBase64 = null
                                     loadFeed()
                                 } else {
                                     publishError = response.optString(
@@ -162,7 +274,7 @@ fun PalRealFeedContent() {
                             }
                         }
                     },
-                    enabled = postText.isNotBlank() && !publishing,
+                    enabled = (postText.isNotBlank() || photoBase64 != null) && !publishing && !selectingPhoto,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = FeedBlue
@@ -317,20 +429,11 @@ private fun RealPostCard(
             .padding(15.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF174F9C)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    authorName.take(1).uppercase(),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
+            ProfileAvatar(
+                photoURL = post.author.photoURL,
+                modifier = Modifier.size(48.dp),
+                fallbackText = authorName
+            )
 
             Spacer(Modifier.width(11.dp))
 
@@ -383,13 +486,8 @@ private fun RealPostCard(
             )
         }
 
-        if (!post.photoData.isNullOrBlank()) {
-            Text(
-                "Cette publication contient une photo.",
-                color = FeedMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
+        post.photoData?.takeIf { it.isNotBlank() }?.let { photo ->
+            PostPhoto(photoData = photo)
         }
 
         HorizontalDivider(color = Color(0xFF252B35))
@@ -620,5 +718,53 @@ private fun FeedMessage(
         ) {
             Text(action)
         }
+    }
+}
+
+
+@Composable
+private fun PostPhoto(photoData: String) {
+    val bitmap = remember(photoData) {
+        runCatching {
+            val encoded = photoData.substringAfter(",", photoData)
+            val bytes = Base64.decode(encoded, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull()
+    }
+
+    bitmap?.let {
+        Image(
+            bitmap = it.asImageBitmap(),
+            contentDescription = "Photo de la publication",
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp)
+                .clip(RoundedCornerShape(14.dp)),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+private fun compressPostPhoto(source: Bitmap): String {
+    var width = source.width
+    var height = source.height
+    var bitmap = source
+
+    while (true) {
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.WEBP, 82, output)
+        val bytes = output.toByteArray()
+
+        if (bytes.size <= 420_000) {
+            return Base64.encodeToString(bytes, Base64.NO_WRAP)
+        }
+
+        if (width <= 160 || height <= 160) {
+            throw Exception("Cette image est trop volumineuse.")
+        }
+
+        width = (width * 0.8).toInt()
+        height = (height * 0.8).toInt()
+        bitmap = Bitmap.createScaledBitmap(bitmap, width, height, true)
     }
 }

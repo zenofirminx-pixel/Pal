@@ -27,6 +27,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        SessionManager.initialize(applicationContext)
+
         setContent {
             PalTheme {
                 PalApp()

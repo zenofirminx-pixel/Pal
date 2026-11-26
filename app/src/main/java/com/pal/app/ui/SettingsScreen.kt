@@ -14,12 +14,16 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.pal.app.data.ProfileRepository
 
 private val SettingsBlue = Color(0xFF087BFF)
 private val SettingsBlack = Color(0xFF000000)
@@ -35,6 +39,17 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     loading: Boolean = false
 ) {
+    var profilePhotoURL by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            val result = ProfileRepository.getProfile()
+            profilePhotoURL = result.profile
+                ?.optString("photoURL")
+                ?.takeIf { it.isNotBlank() && it != "null" }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -87,20 +102,11 @@ fun SettingsScreen(
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(62.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF202631)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.PhotoCamera,
-                        contentDescription = "Modifier la photo",
-                        tint = SettingsBlue,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                ProfileAvatar(
+                    photoURL = profilePhotoURL,
+                    modifier = Modifier.size(62.dp),
+                    fallbackText = "P"
+                )
 
                 Spacer(Modifier.width(14.dp))
 

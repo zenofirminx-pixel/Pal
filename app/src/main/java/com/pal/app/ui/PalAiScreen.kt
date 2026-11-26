@@ -46,9 +46,30 @@ fun PalAiScreen(onBack: () -> Unit = {}) {
 
     var input by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
+    var loadingHistory by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        try {
+            val history = AssistantRepository.getHistory()
+
+            if (history.isNotEmpty()) {
+                messages = history.map { (role, content) ->
+                    AiMessage(
+                        fromUser = role == "user",
+                        text = content
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            error = e.message
+                ?: "Impossible de récupérer les anciennes conversations."
+        } finally {
+            loadingHistory = false
+        }
+    }
 
     Column(
         Modifier
@@ -143,6 +164,16 @@ fun PalAiScreen(onBack: () -> Unit = {}) {
                 }
             }
 
+            if (loadingHistory) {
+                item {
+                    Text(
+                        "Récupération de la conversation...",
+                        color = AiBlue,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
+
             if (sending) {
                 item {
                     Text(
@@ -196,7 +227,7 @@ fun PalAiScreen(onBack: () -> Unit = {}) {
             )
 
             IconButton(
-                enabled = !sending && input.isNotBlank(),
+                enabled = !sending && !loadingHistory && input.isNotBlank(),
                 onClick = {
 
                     val message = input.trim()

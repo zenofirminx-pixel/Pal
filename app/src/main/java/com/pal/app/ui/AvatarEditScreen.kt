@@ -43,8 +43,18 @@ fun AvatarEditScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var existingPhotoURL by remember { mutableStateOf<String?>(null) }
     var imageBase64 by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            val result = ProfileRepository.getProfile()
+            existingPhotoURL = result.profile
+                ?.optString("photoURL")
+                ?.takeIf { it.isNotBlank() && it != "null" }
+        }
+    }
     var error by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
 
@@ -129,6 +139,12 @@ fun AvatarEditScreen(onBack: () -> Unit) {
                         contentDescription = "Aperçu de la photo",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
+                    )
+                } else if (!existingPhotoURL.isNullOrBlank()) {
+                    ProfileAvatar(
+                        photoURL = existingPhotoURL,
+                        modifier = Modifier.fillMaxSize(),
+                        fallbackText = "P"
                     )
                 } else {
                     Icon(
