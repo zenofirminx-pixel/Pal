@@ -82,4 +82,4 @@ object AssistantRepository {
                 }
             }
         }
-\n}\n
+\}
