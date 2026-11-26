@@ -23,6 +23,7 @@ private val ProfileBlack = Color(0xFF000000)
 private val ProfileCard = Color(0xFF0D1015)
 private val ProfileMuted = Color(0xFF8C929D)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileEditScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
