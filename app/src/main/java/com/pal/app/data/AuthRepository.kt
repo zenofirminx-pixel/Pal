@@ -78,6 +78,17 @@ object AuthRepository {
         result(ApiClient.post("/api/auth/2fa/login", body))
     }
 
+    suspend fun verifyAccountPassword(
+        password: String
+    ): AuthResult = withContext(Dispatchers.IO) {
+
+        val body = JSONObject().apply {
+            put("password", password)
+        }
+
+        result(ApiClient.post("/api/auth/verify-account", body))
+    }
+
     suspend fun currentUser(): AuthResult = withContext(Dispatchers.IO) {
         result(ApiClient.get("/api/auth/me"))
     }

@@ -1,12 +1,14 @@
 package com.pal.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,6 +39,8 @@ class MainActivity : ComponentActivity() {
 private fun PalApp() {
     var checkingSession by remember { mutableStateOf(true) }
     var authenticated by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         if (SessionManager.hasSession()) {
@@ -77,7 +81,22 @@ private fun PalApp() {
         }
 
         authenticated -> {
-            PalHomeScreen()
+            PalHomeScreen(
+                onLogout = {
+                    scope.launch {
+                        val result = AuthRepository.logout()
+                        if (result.success) {
+                            authenticated = false
+                        } else {
+                            Toast.makeText(
+                                context,
+                                result.message,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+            )
         }
 
         else -> {

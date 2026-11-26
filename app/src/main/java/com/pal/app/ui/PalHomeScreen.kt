@@ -48,61 +48,138 @@ private val Muted = Color(0xFF8C929D)
 
 
 @Composable
-fun PalHomeScreen() {
+fun PalHomeScreen(onLogout: () -> Unit = {}) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var liked by remember { mutableStateOf(false) }
     var previousTab by remember { mutableIntStateOf(0) }
+    var settingsPage by remember { mutableStateOf<String?>(null) }
 
     Surface(color = PalBlack, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            TopBar()
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                when (selectedTab) {
-                    0 -> PalRealFeedContent()
-                    1 -> MessagesScreen(
-                        onOpenPalAi = {
-                            previousTab = 1
-                            selectedTab = 4
-                        }
-                    )
-                    2 -> NotificationsScreen()
-                    3 -> SearchScreen()
-                    4 -> PalAiScreen(
-                        onBack = { selectedTab = previousTab }
-                    )
-                }
+            if (settingsPage == null) {
+                TopBar(onMenuClick = { settingsPage = "main" })
             }
 
-            BottomBar(selectedTab) { tab ->
-                if (tab == 4) {
-                    previousTab = selectedTab
+            if (settingsPage != null) {
+                when (settingsPage) {
+                    "main" -> SettingsScreen(
+                        onBack = { settingsPage = null },
+                        onEditPhoto = { settingsPage = "photo" },
+                        onEditProfile = { settingsPage = "profile" },
+                        onSecurity = { settingsPage = "security" },
+                        onLogout = onLogout
+                    )
+
+                    "profile" -> ProfileEditScreen(
+                        onBack = { settingsPage = "main" }
+                    )
+                    "photo" -> AvatarEditScreen(
+                        onBack = { settingsPage = "main" }
+                    )
+                    "security" -> SecurityScreen(
+                        onBack = { settingsPage = "main" }
+                    )
+                    else -> SettingsPlaceholderScreen(
+                        title = when (settingsPage) {
+                            "photo" -> "Photo de profil"
+                            "security" -> "Authentification à deux facteurs"
+                            else -> "Paramètres"
+                        },
+                        onBack = { settingsPage = "main" }
+                    )
                 }
-                selectedTab = tab
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    when (selectedTab) {
+                        0 -> PalRealFeedContent()
+                        1 -> MessagesScreen(
+                            onOpenPalAi = {
+                                previousTab = 1
+                                selectedTab = 4
+                            }
+                        )
+                        2 -> NotificationsScreen()
+                        3 -> SearchScreen()
+                        4 -> PalAiScreen(
+                            onBack = { selectedTab = previousTab }
+                        )
+                    }
+                }
+
+                BottomBar(selectedTab) { tab ->
+                    if (tab == 4) {
+                        previousTab = selectedTab
+                    }
+                    selectedTab = tab
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TopBar() {
+private fun SettingsPlaceholderScreen(
+    title: String,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PalBlack)
+            .padding(20.dp)
+    ) {
+        Text(
+            "‹  Retour",
+            color = PalBlue,
+            modifier = Modifier
+                .clickable(onClick = onBack)
+                .padding(vertical = 12.dp)
+        )
+
+        Text(
+            title,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun TopBar(onMenuClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PalMark(Modifier.size(42.dp))
         Spacer(Modifier.width(10.dp))
-        Text("Pal", color = PalBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
-        Text(" Messenger", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "Pal",
+            color = PalBlue,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Text(
+            " Messenger",
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium
+        )
         Spacer(Modifier.weight(1f))
-        Icon(Icons.Default.Menu, contentDescription = "Paramètres", tint = Color.White, modifier = Modifier.size(30.dp).clickable { })
+        Icon(
+            Icons.Default.Menu,
+            contentDescription = "Paramètres",
+            tint = Color.White,
+            modifier = Modifier
+                .size(30.dp)
+                .clickable(onClick = onMenuClick)
+        )
     }
 }
-
 
 @Composable
 private fun PalMark(modifier: Modifier) {

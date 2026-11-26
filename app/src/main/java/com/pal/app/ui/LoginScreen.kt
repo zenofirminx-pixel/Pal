@@ -20,6 +20,7 @@ private val PalBlue = Color(0xFF087BFF)
 fun LoginScreen(onAuthenticated: () -> Unit) {
     var registering by remember { mutableStateOf(false) }
     var twoFactor by remember { mutableStateOf(false) }
+    var accountVerification by remember { mutableStateOf(false) }
 
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
@@ -28,6 +29,7 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var verificationPassword by remember { mutableStateOf("") }
 
     var message by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
@@ -52,9 +54,12 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         Text(
-            text = if (twoFactor) "Vérification de sécurité"
-                   else if (registering) "Rejoindre Pal"
-                   else "Connexion au réseau Pal",
+            text = when {
+                accountVerification -> "Vérification de ton compte"
+                twoFactor -> "Vérification de sécurité"
+                registering -> "Rejoindre Pal"
+                else -> "Connexion au réseau Pal"
+            },
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = Color.White
@@ -62,82 +67,113 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
 
         Spacer(Modifier.height(24.dp))
 
-        if (registering) {
-            OutlinedTextField(
-                value = firstName,
-                onValueChange = { firstName = it },
-                label = { Text("Prénom") },
-                modifier = Modifier.fillMaxWidth()
+        if (accountVerification) {
+            Text(
+                text = "Pour terminer la création de ton compte, " +
+                    "confirme ton mot de passe. Cette vérification " +
+                    "temporaire permet d'activer ton compte Pal.",
+                color = Color.LightGray,
+                style = MaterialTheme.typography.bodyMedium
             )
-            Spacer(Modifier.height(10.dp))
+
+            Spacer(Modifier.height(20.dp))
 
             OutlinedTextField(
-                value = lastName,
-                onValueChange = { lastName = it },
-                label = { Text("Nom") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = birthDate,
-                onValueChange = { birthDate = it },
-                label = { Text("Date de naissance") },
-                placeholder = { Text("AAAA-MM-JJ") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(10.dp))
-
-            Text("Genre", color = Color.White)
-            Column(Modifier.fillMaxWidth()) {
-                listOf(
-                    "female" to "Femme",
-                    "male" to "Homme",
-                    "other" to "Autre",
-                    "prefer_not_say" to "Préfère ne pas répondre"
-                ).forEach { (value, label) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = gender == value,
-                            onClick = { gender = value },
-                            colors = RadioButtonDefaults.colors(selectedColor = PalBlue)
-                        )
-                        Text(label, color = Color.White)
-                    }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-
-        if (twoFactor) {
-            OutlinedTextField(
-                value = code,
-                onValueChange = { code = it },
-                label = { Text("Code de vérification") },
-                modifier = Modifier.fillMaxWidth()
+                value = verificationPassword,
+                onValueChange = { verificationPassword = it },
+                label = { Text("Confirme ton mot de passe") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
         } else {
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Adresse e-mail") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (registering && !twoFactor) {
+                OutlinedTextField(
+                    value = firstName,
+                    onValueChange = { firstName = it },
+                    label = { Text("Prénom") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
 
-            Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = lastName,
+                    onValueChange = { lastName = it },
+                    label = { Text("Nom") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
 
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Mot de passe") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
+                OutlinedTextField(
+                    value = birthDate,
+                    onValueChange = { birthDate = it },
+                    label = { Text("Date de naissance") },
+                    placeholder = { Text("AAAA-MM-JJ") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                Text("Genre", color = Color.White)
+
+                Column(Modifier.fillMaxWidth()) {
+                    listOf(
+                        "female" to "Femme",
+                        "male" to "Homme",
+                        "other" to "Autre",
+                        "prefer_not_say" to "Préfère ne pas répondre"
+                    ).forEach { (value, label) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = gender == value,
+                                onClick = { gender = value },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = PalBlue
+                                )
+                            )
+                            Text(label, color = Color.White)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+
+            if (twoFactor) {
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it },
+                    label = { Text("Code de vérification ou code de récupération") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            } else {
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Adresse e-mail") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Mot de passe") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
         }
 
         if (message.isNotBlank()) {
             Spacer(Modifier.height(12.dp))
-            Text(message, color = Color(0xFFFF8A80))
+            Text(
+                text = message,
+                color = if (accountVerification && !loading) Color(0xFF80CBC4)
+                else Color(0xFFFF8A80)
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -151,48 +187,77 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
 
                 scope.launch {
                     try {
-                        val result = when {
-                            twoFactor ->
-                                AuthRepository.verifyTwoFactor(code)
+                        if (accountVerification) {
+                            val result = AuthRepository.verifyAccountPassword(
+                                verificationPassword
+                            )
 
-                            registering ->
-                                AuthRepository.register(
-                                    firstName = firstName,
-                                    lastName = lastName,
-                                    birthDate = birthDate,
-                                    gender = gender,
-                                    email = email,
-                                    password = password
-                                )
+                            if (result.success) {
+                                onAuthenticated()
+                            } else {
+                                message = result.message.ifBlank {
+                                    "Mot de passe incorrect ou vérification échouée."
+                                }
+                            }
+                        } else {
+                            val result = when {
+                                twoFactor ->
+                                    AuthRepository.verifyTwoFactor(code)
 
-                            else ->
-                                AuthRepository.login(email, password)
-                        }
+                                registering ->
+                                    AuthRepository.register(
+                                        firstName = firstName,
+                                        lastName = lastName,
+                                        birthDate = birthDate,
+                                        gender = gender,
+                                        email = email,
+                                        password = password
+                                    )
 
-                        when {
-                            !result.success -> {
+                                else ->
+                                    AuthRepository.login(email, password)
+                            }
+
+                            if (!result.success) {
                                 message = result.message.ifBlank {
                                     "Une erreur est survenue (HTTP ${result.httpStatus})."
                                 }
-                            }
-
-                            twoFactor -> {
+                            } else if (twoFactor) {
                                 twoFactor = false
-                                onAuthenticated()
-                            }
+                                code = ""
 
-                            registering -> {
+                                val verified = result.user?.optBoolean(
+                                    "emailVerified", false
+                                ) ?: false
+
+                                if (verified) {
+                                    onAuthenticated()
+                                } else {
+                                    accountVerification = true
+                                    message = "Confirme ton mot de passe pour activer ton compte."
+                                }
+                            } else if (registering) {
                                 registering = false
-                                message = "Compte créé. Vérifie ton adresse e-mail avant de te connecter."
+                                accountVerification = true
+                                verificationPassword = ""
                                 password = ""
-                            }
-
-                            result.twoFactorRequired -> {
+                                message = "Compte créé. Confirme ton mot de passe pour continuer."
+                            } else if (result.twoFactorRequired) {
                                 twoFactor = true
-                                message = "Saisis ton code de vérification."
-                            }
+                                message = "Saisis ton code 2FA ou un code de récupération."
+                            } else {
+                                val verified = result.user?.optBoolean(
+                                    "emailVerified", false
+                                ) ?: false
 
-                            else -> onAuthenticated()
+                                if (verified) {
+                                    onAuthenticated()
+                                } else {
+                                    accountVerification = true
+                                    verificationPassword = ""
+                                    message = "Confirme ton mot de passe pour activer ton compte."
+                                }
+                            }
                         }
                     } catch (exception: Exception) {
                         message = exception.message ?: "Impossible de contacter le serveur."
@@ -201,13 +266,15 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
                     }
                 }
             },
-            enabled = !loading,
+            enabled = !loading &&
+                (!accountVerification || verificationPassword.isNotBlank()),
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = PalBlue)
         ) {
             Text(
                 when {
-                    loading -> "Connexion..."
+                    loading -> "Chargement..."
+                    accountVerification -> "Vérifier et continuer"
                     twoFactor -> "Vérifier"
                     registering -> "Créer mon compte"
                     else -> "Se connecter"
@@ -217,36 +284,61 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        TextButton(
-            onClick = {
-                registering = !registering
-                twoFactor = false
-                message = ""
-            },
-            enabled = !loading && !twoFactor
-        ) {
-            Text(
-                if (registering) "Déjà inscrit ? Se connecter"
-                else "Sign in for a new account",
-                color = PalBlue
-            )
+        if (!accountVerification) {
+            TextButton(
+                onClick = {
+                    registering = !registering
+                    twoFactor = false
+                    code = ""
+                    message = ""
+                },
+                enabled = !loading && !twoFactor
+            ) {
+                Text(
+                    if (registering) "Déjà inscrit ? Se connecter"
+                    else "Sign in for a new account",
+                    color = PalBlue
+                )
+            }
         }
 
-        if (twoFactor) {
-            TextButton(onClick = {
-                twoFactor = false
-                message = ""
-            }) {
+        if (twoFactor && !accountVerification) {
+            TextButton(
+                onClick = {
+                    twoFactor = false
+                    code = ""
+                    message = ""
+                },
+                enabled = !loading
+            ) {
                 Text("Retour", color = PalBlue)
+            }
+        }
+
+        if (accountVerification) {
+            TextButton(
+                onClick = {
+                    accountVerification = false
+                    registering = false
+                    twoFactor = false
+                    verificationPassword = ""
+                    password = ""
+                    message = ""
+                },
+                enabled = !loading
+            ) {
+                Text("Retour à la connexion", color = PalBlue)
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
-        Text(
-            "Learn more for login",
-            color = Color.Gray,
-            style = MaterialTheme.typography.labelSmall
-        )
+        if (!accountVerification && !twoFactor) {
+            Text(
+                "Learn more for login",
+                color = Color.Gray,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
     }
 }
