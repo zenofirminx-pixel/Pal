@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.json.JSONObject
 
 private val PalBlue = Color(0xFF087BFF)
 private val PalBlack = Color(0xFF000000)
@@ -53,11 +54,13 @@ fun PalHomeScreen(onLogout: () -> Unit = {}) {
     var liked by remember { mutableStateOf(false) }
     var previousTab by remember { mutableIntStateOf(0) }
     var settingsPage by remember { mutableStateOf<String?>(null) }
+    var selectedPublicUserUid by remember { mutableStateOf<String?>(null) }
+    var pendingChatUser by remember { mutableStateOf<JSONObject?>(null) }
 
     Surface(color = PalBlack, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
 
-            if (settingsPage == null) {
+            if (settingsPage == null && selectedPublicUserUid == null) {
                 TopBar(onMenuClick = { settingsPage = "main" })
             }
 
@@ -90,32 +93,60 @@ fun PalHomeScreen(onLogout: () -> Unit = {}) {
                     )
                 }
             } else {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    when (selectedTab) {
-                        0 -> PalRealFeedContent()
-                        1 -> MessagesScreen(
-                            onOpenPalAi = {
-                                previousTab = 1
-                                selectedTab = 4
-                            }
-                        )
-                        2 -> NotificationsScreen()
-                        3 -> SearchScreen()
-                        4 -> PalAiScreen(
-                            onBack = { selectedTab = previousTab }
-                        )
-                    }
-                }
+                if (selectedPublicUserUid != null) {
+                    PublicProfileScreen(
+                        uid = selectedPublicUserUid!!,
+                        onBack = { selectedPublicUserUid = null },
+                        onOpenChat = { user ->
+                            pendingChatUser = user
+                            selectedPublicUserUid = null
+                            selectedTab = 1
+                        }
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        when (selectedTab) {
+                            0 -> PalRealFeedContent()
 
-                BottomBar(selectedTab) { tab ->
-                    if (tab == 4) {
-                        previousTab = selectedTab
+                            1 -> MessagesScreen(
+                                onOpenPalAi = {
+                                    previousTab = 1
+                                    selectedTab = 4
+                                },
+                                initialUser = pendingChatUser,
+                                onInitialUserOpened = {
+                                    pendingChatUser = null
+                                }
+                            )
+
+                            2 -> NotificationsScreen(
+                                onOpenProfile = { uid ->
+                                    selectedPublicUserUid = uid
+                                }
+                            )
+
+                            3 -> SearchScreen(
+                                onOpenProfile = { uid ->
+                                    selectedPublicUserUid = uid
+                                }
+                            )
+
+                            4 -> PalAiScreen(
+                                onBack = { selectedTab = previousTab }
+                            )
+                        }
                     }
-                    selectedTab = tab
+
+                    BottomBar(selectedTab) { tab ->
+                        if (tab == 4) {
+                            previousTab = selectedTab
+                        }
+                        selectedTab = tab
+                    }
                 }
             }
         }

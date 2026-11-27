@@ -29,7 +29,11 @@ private val MsgCard = Color(0xFF0D1015)
 private val MsgMuted = Color(0xFF8C929D)
 
 @Composable
-fun MessagesScreen(onOpenPalAi: () -> Unit = {}) {
+fun MessagesScreen(
+    onOpenPalAi: () -> Unit = {},
+    initialUser: JSONObject? = null,
+    onInitialUserOpened: () -> Unit = {}
+) {
     var conversations by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -62,6 +66,13 @@ fun MessagesScreen(onOpenPalAi: () -> Unit = {}) {
 
     LaunchedEffect(Unit) {
         loadConversations()
+    }
+
+    LaunchedEffect(initialUser) {
+        if (initialUser != null && initialUser.optString("uid").isNotBlank()) {
+            selectedUser = initialUser
+            onInitialUserOpened()
+        }
     }
 
     val current = selectedUser

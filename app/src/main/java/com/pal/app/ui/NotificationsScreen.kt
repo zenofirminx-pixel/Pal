@@ -25,7 +25,7 @@ private val NotificationBlue = Color(0xFF087BFF)
 private val NotificationCard = Color(0xFF10141B)
 
 @Composable
-fun NotificationsScreen() {
+fun NotificationsScreen(onOpenProfile: (String) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val notifications = remember { mutableStateListOf<JSONObject>() }
     var loading by remember { mutableStateOf(true) }
@@ -82,7 +82,28 @@ fun NotificationsScreen() {
             Spacer(Modifier.weight(1f))
 
             IconButton(
-                onClick = { scope.launch { loadNotifications() } }
+                onClick = {
+                                val id = notification.optString("id")
+                                val type = notification.optString("type")
+                                val actorUid = notification.optString("actorUid")
+
+                                if (type == "friend_request" && actorUid.isNotBlank()) {
+                                    onOpenProfile(actorUid)
+                                }
+
+                                if (id.isNotBlank() && !notification.optBoolean("read")) {
+                                    scope.launch {
+                                        try {
+                                            val result = SocialRepository.markNotificationRead(id)
+                                            if (result.optBoolean("success")) {
+                                                notification.put("read", true)
+                                            }
+                                        } catch (_: Exception) {
+                                            error = "Impossible de mettre à jour cette notification."
+                                        }
+                                    }
+                                }
+                            }
             ) {
                 Icon(
                     Icons.Default.Refresh,

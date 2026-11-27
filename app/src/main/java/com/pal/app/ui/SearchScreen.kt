@@ -26,7 +26,7 @@ private val SearchBlue = Color(0xFF087BFF)
 private val SearchCard = Color(0xFF10141B)
 
 @Composable
-fun SearchScreen() {
+fun SearchScreen(onOpenProfile: (String) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     val users = remember { mutableStateListOf<JSONObject>() }
@@ -171,7 +171,7 @@ fun SearchScreen() {
                         items = users,
                         key = { it.optString("uid") }
                     ) { user ->
-                        SearchUserItem(user)
+                        SearchUserItem(user, onClick = { onOpenProfile(user.optString("uid")) })
                     }
                 }
             }
@@ -180,7 +180,7 @@ fun SearchScreen() {
 }
 
 @Composable
-private fun SearchUserItem(user: JSONObject) {
+private fun SearchUserItem(user: JSONObject, onClick: () -> Unit) {
     val scope = rememberCoroutineScope()
     var sending by remember { mutableStateOf(false) }
     var requestSent by remember { mutableStateOf(false) }
@@ -193,7 +193,9 @@ private fun SearchUserItem(user: JSONObject) {
     val username = user.optString("username")
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = SearchCard)
     ) {
@@ -201,18 +203,11 @@ private fun SearchUserItem(user: JSONObject) {
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(SearchBlue.copy(alpha = 0.18f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        fullName.firstOrNull()?.uppercase() ?: "?",
-                        color = SearchBlue,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                ProfileAvatar(
+                    photoURL = user.optString("photoURL").takeIf { it.isNotBlank() && it != "null" },
+                    modifier = Modifier.size(46.dp),
+                    fallbackText = fullName.firstOrNull()?.uppercase() ?: "?"
+                )
 
                 Spacer(Modifier.width(12.dp))
 

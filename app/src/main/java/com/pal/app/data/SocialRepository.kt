@@ -135,4 +135,25 @@ object SocialRepository {
             )
         }
 
+    suspend fun getPublicProfile(uid: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            ApiClient.get("/api/social/users/$uid")
+        }
+
+    suspend fun acceptFriendRequest(uid: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            ApiClient.post(
+                "/api/social/friends/$uid/accept",
+                JSONObject()
+            )
+        }
+
+    suspend fun declineFriendRequest(uid: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            ApiClient.post(
+                "/api/social/friends/$uid/decline",
+                JSONObject()
+            )
+        }
+
 }
