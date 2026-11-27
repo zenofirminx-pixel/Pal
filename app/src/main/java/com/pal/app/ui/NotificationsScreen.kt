@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 private val NotificationBlue = Color(0xFF087BFF)
-private val NotificationCard = Color(0xFF10141B)
+private val NotificationCard = Color(0xFF0D1015)
 
 @Composable
 fun NotificationsScreen(onOpenProfile: (String) -> Unit = {}) {
@@ -39,10 +39,14 @@ fun NotificationsScreen(onOpenProfile: (String) -> Unit = {}) {
             val response = SocialRepository.getNotifications()
 
             if (!response.optBoolean("success")) {
-                error = response.optString("message", "Impossible de charger les notifications.")
+                error = response.optString(
+                    "message",
+                    "Impossible de charger les notifications."
+                )
             } else {
                 notifications.clear()
                 val array = response.optJSONArray("notifications")
+
                 if (array != null) {
                     for (i in 0 until array.length()) {
                         array.optJSONObject(i)?.let { notifications.add(it) }
@@ -82,28 +86,7 @@ fun NotificationsScreen(onOpenProfile: (String) -> Unit = {}) {
             Spacer(Modifier.weight(1f))
 
             IconButton(
-                onClick = {
-                                val id = notification.optString("id")
-                                val type = notification.optString("type")
-                                val actorUid = notification.optString("actorUid")
-
-                                if (type == "friend_request" && actorUid.isNotBlank()) {
-                                    onOpenProfile(actorUid)
-                                }
-
-                                if (id.isNotBlank() && !notification.optBoolean("read")) {
-                                    scope.launch {
-                                        try {
-                                            val result = SocialRepository.markNotificationRead(id)
-                                            if (result.optBoolean("success")) {
-                                                notification.put("read", true)
-                                            }
-                                        } catch (_: Exception) {
-                                            error = "Impossible de mettre à jour cette notification."
-                                        }
-                                    }
-                                }
-                            }
+                onClick = { scope.launch { loadNotifications() } }
             ) {
                 Icon(
                     Icons.Default.Refresh,
@@ -115,7 +98,10 @@ fun NotificationsScreen(onOpenProfile: (String) -> Unit = {}) {
 
         when {
             loading && notifications.isEmpty() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator(color = NotificationBlue)
                 }
             }
@@ -148,7 +134,16 @@ fun NotificationsScreen(onOpenProfile: (String) -> Unit = {}) {
                             notification = notification,
                             onClick = {
                                 val id = notification.optString("id")
-                                if (id.isNotBlank() && !notification.optBoolean("read")) {
+                                val type = notification.optString("type")
+                                val actorUid = notification.optString("actorUid")
+
+                                if (type == "friend_request" && actorUid.isNotBlank()) {
+                                    onOpenProfile(actorUid)
+                                }
+
+                                if (id.isNotBlank() &&
+                                    !notification.optBoolean("read")
+                                ) {
                                     scope.launch {
                                         try {
                                             val result =
@@ -178,6 +173,7 @@ private fun NotificationItem(
 ) {
     val read = notification.optBoolean("read")
     val actor = notification.optJSONObject("actor")
+
     val actorName = actor?.let {
         listOf(
             it.optString("firstName"),
@@ -188,6 +184,7 @@ private fun NotificationItem(
     }
 
     val type = notification.optString("type")
+
     val message = when (type) {
         "like" -> "$actorName a aimé une publication."
         "comment" -> "$actorName a commenté une publication."
@@ -213,7 +210,10 @@ private fun NotificationItem(
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .background(NotificationBlue.copy(alpha = 0.15f), RoundedCornerShape(50)),
+                    .background(
+                        NotificationBlue.copy(alpha = 0.15f),
+                        RoundedCornerShape(50)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -229,10 +229,15 @@ private fun NotificationItem(
                 Text(
                     message,
                     color = Color.White,
-                    fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold
+                    fontWeight = if (read) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.SemiBold
+                    }
                 )
 
                 val date = notification.optString("createdAt")
+
                 if (date.isNotBlank()) {
                     Spacer(Modifier.height(5.dp))
                     Text(
@@ -254,7 +259,7 @@ private fun NotificationItem(
                 Icon(
                     Icons.Default.Done,
                     contentDescription = "Lue",
-                    tint = Color(0xFF687383),
+                    tint = Color(0xFF8C929D),
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -275,13 +280,13 @@ private fun EmptyNotificationState(
             Icon(
                 Icons.Default.NotificationsNone,
                 contentDescription = null,
-                tint = Color(0xFF687383),
+                tint = Color(0xFF8C929D),
                 modifier = Modifier.size(48.dp)
             )
 
             Spacer(Modifier.height(12.dp))
 
-            Text(message, color = Color(0xFF9AA3B2))
+            Text(message, color = Color(0xFF8C929D))
 
             Spacer(Modifier.height(14.dp))
 
