@@ -1,5 +1,8 @@
 package com.pal.app.ui
 
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.clickable
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.BackHandler
@@ -31,6 +34,7 @@ private val SecurityMuted = Color(0xFF8C929D)
 @Composable
 fun SecurityScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var enabled by remember { mutableStateOf<Boolean?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -228,8 +232,17 @@ fun SecurityScreen(onBack: () -> Unit) {
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        manualKey,
-                        color = SecurityBlue
+                        text = manualKey,
+                        color = SecurityBlue,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(
+                                    android.content.ClipData.newPlainText("Pal 2FA", manualKey)
+                                )
+                                Toast.makeText(context, "Clé copiée", Toast.LENGTH_SHORT).show()
+                            }
                     )
 
                     Text(

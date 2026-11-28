@@ -1,5 +1,8 @@
 package com.pal.app.ui
 
+import com.pal.app.data.models.PalStoryGroup
+import com.pal.app.data.ProfileRepository
+import androidx.compose.foundation.lazy.LazyRow
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -28,6 +31,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +51,18 @@ private val FeedMuted = Color(0xFF8C929D)
 @Composable
 fun PalRealFeedContent() {
     var posts by remember { mutableStateOf<List<PalPost>>(emptyList()) }
+    var storyGroups by remember { mutableStateOf<List<PalStoryGroup>>(emptyList()) }
+    var selectedStoryGroup by remember { mutableStateOf<PalStoryGroup?>(null) }
+    var myPhotoURL by remember { mutableStateOf<String?>(null) }
+    var myDisplayName by remember { mutableStateOf("Moi") }
+    var storiesLoading by remember { mutableStateOf(false) }
+    var storyBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var storyPhotoBase64 by remember { mutableStateOf<String?>(null) }
+    var selectingStoryPhoto by remember { mutableStateOf(false) }
+    var creatingStory by remember { mutableStateOf(false) }
+    var storyError by remember { mutableStateOf<String?>(null) }
+
+
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var postText by remember { mutableStateOf("") }
@@ -57,6 +74,7 @@ fun PalRealFeedContent() {
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
+    val postFocusRequester = remember { FocusRequester() }
 
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -109,6 +127,53 @@ fun PalRealFeedContent() {
         }
     }
 
+
+    val storyPhotoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                selectingStoryPhoto = true
+                storyError = null
+                try {
+                    val bitmap = withContext(Dispatchers.IO) {
+                        val bounds = BitmapFactory.Options().apply {
+                            inJustDecodeBounds = true
+                        }
+                        context.contentResolver.openInputStream(uri)?.use {
+                            BitmapFactory.decodeStream(it, null, bounds)
+                        }
+                        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                            throw Exception("Image illisible.")
+                        }
+                        var sampleSize = 1
+                        while (
+                            bounds.outWidth / sampleSize > 1920 ||
+                            bounds.outHeight / sampleSize > 1920
+                        ) {
+                            sampleSize *= 2
+                        }
+                        val options = BitmapFactory.Options().apply {
+                            inSampleSize = sampleSize
+                        }
+                        context.contentResolver.openInputStream(uri)?.use {
+                            BitmapFactory.decodeStream(it, null, options)
+                        } ?: throw Exception("Impossible de lire cette image.")
+                    }
+                    val encoded = withContext(Dispatchers.Default) {
+                        compressPostPhoto(bitmap)
+                    }
+                    storyBitmap = bitmap
+                    storyPhotoBase64 = encoded
+                } catch (e: Exception) {
+                    storyError = e.message ?: "Impossible de charger cette image."
+                } finally {
+                    selectingStoryPhoto = false
+                }
+            }
+        }
+    }
+
     suspend fun loadFeed() {
         loading = true
         error = null
@@ -129,8 +194,57 @@ fun PalRealFeedContent() {
         loading = false
     }
 
+    suspend fun loadStories() {
+        storiesLoading = true
+        try {
+            val result = SocialRepository.getStories()
+            if (result.success) storyGroups = result.groups
+
+            val profile = ProfileRepository.getProfile()
+            if (profile.success) {
+                val data = profile.profile
+                myPhotoURL = data?.optString("photoURL")
+                    ?.takeIf { it.isNotBlank() && it != "null" }
+                val first = data?.optString("firstName").orEmpty()
+                myDisplayName = first.ifBlank { "Moi" }
+            }
+        } catch (_: Exception) {
+            // Les publications restent accessibles même si les Stories échouent.
+        } finally {
+            storiesLoading = false
+        }
+    }
+
+
+    suspend fun publishStory() {
+        val encoded = storyPhotoBase64 ?: return
+        creatingStory = true
+        storyError = null
+        try {
+            val response = SocialRepository.createStory(
+                photoData = "data:image/webp;base64,$encoded",
+                photoMimeType = "image/webp"
+            )
+            if (response.optBoolean("success")) {
+                storyBitmap = null
+                storyPhotoBase64 = null
+                loadStories()
+            } else {
+                storyError = response.optString(
+                    "message",
+                    "La publication de la Story a échoué."
+                )
+            }
+        } catch (e: Exception) {
+            storyError = e.message ?: "Erreur lors de la publication de la Story."
+        } finally {
+            creatingStory = false
+        }
+    }
+
     LaunchedEffect(Unit) {
         loadFeed()
+        loadStories()
     }
 
     LazyColumn(
@@ -144,29 +258,157 @@ fun PalRealFeedContent() {
         verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp)
             ) {
-                Text(
-                    "Fil d’actualité",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                IconButton(
-                    onClick = {
-                        scope.launch { loadFeed() }
+                item {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(82.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .background(FeedCard)
+                                .clickable {
+                                    if (!selectingStoryPhoto && !creatingStory) {
+                                        storyPhotoPicker.launch("image/*")
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            ProfileAvatar(
+                                photoURL = myPhotoURL,
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(CircleShape)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(29.dp)
+                                    .clip(CircleShape)
+                                    .background(FeedBlue),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "+",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Ajouter une story",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 2
+                        )
                     }
-                ) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = "Actualiser",
-                        tint = FeedBlue
-                    )
                 }
+
+                items(storyGroups) { group ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(82.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .background(FeedBlue)
+                                .clickable { selectedStoryGroup = group }
+                                .padding(3.dp)
+                        ) {
+                            ProfileAvatar(
+                                photoURL = group.author.photoURL,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            group.author.firstName.ifBlank {
+                                group.author.username.ifBlank { "Pal" }
+                            },
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        if (storyBitmap != null) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(FeedCard)
+                        .padding(12.dp)
+                ) {
+                    Text("Aperçu de ta story", color = Color.White)
+                    Spacer(Modifier.height(10.dp))
+                    Image(
+                        bitmap = storyBitmap!!.asImageBitmap(),
+                        contentDescription = "Aperçu de la Story",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                    storyError?.let {
+                        Text(it, color = Color(0xFFFF6B6B))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = {
+                                storyBitmap = null
+                                storyPhotoBase64 = null
+                                storyError = null
+                            },
+                            enabled = !creatingStory
+                        ) {
+                            Text("Annuler", color = FeedMuted)
+                        }
+                        Button(
+                            onClick = { scope.launch { publishStory() } },
+                            enabled = !creatingStory &&
+                                !selectingStoryPhoto &&
+                                storyPhotoBase64 != null,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FeedBlue
+                            )
+                        ) {
+                            if (creatingStory) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Publier la story", color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (storyError != null && storyBitmap == null) {
+            item {
+                Text(storyError!!, color = Color(0xFFFF6B6B))
             }
         }
 
@@ -178,37 +420,32 @@ fun PalRealFeedContent() {
                     .background(FeedCard)
                     .padding(15.dp)
             ) {
-                Text(
-                    "Créer une publication",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
 
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = postText,
-                    onValueChange = {
-                        if (it.length <= 5000) postText = it
-                        publishError = null
-                    },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Quoi de neuf ?") },
-                    minLines = 3,
-                    maxLines = 6,
-                    enabled = !publishing
-                )
-
-                OutlinedButton(
-                    onClick = { photoPicker.launch("image/*") },
-                    enabled = !publishing && !selectingPhoto,
-                    modifier = Modifier.fillMaxWidth()
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        if (selectingPhoto) "Chargement..."
-                        else if (photoBase64 != null) "Changer la photo"
-                        else "Ajouter une photo",
-                        color = Color.White
+                    ProfileAvatar(
+                        photoURL = myPhotoURL,
+                        modifier = Modifier.size(44.dp),
+                        fallbackText = myDisplayName.take(1).uppercase()
+                    )
+
+                    Spacer(Modifier.width(10.dp))
+
+                    OutlinedTextField(
+                        value = postText,
+                        onValueChange = {
+                            if (it.length <= 5000) postText = it
+                            publishError = null
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(postFocusRequester),
+                        placeholder = { Text("Ta pensée du moment ?") },
+                        minLines = 1,
+                        maxLines = 4,
+                        enabled = !publishing
                     )
                 }
 
@@ -238,16 +475,39 @@ fun PalRealFeedContent() {
                     Text(it, color = Color(0xFFFF6B6B))
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
 
-                Button(
-                    onClick = {
-                        scope.launch {
-                            publishing = true
-                            publishError = null
-                            try {
-                                val response =
-                                    SocialRepository.createPost(
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { photoPicker.launch("image/*") },
+                        enabled = !publishing && !selectingPhoto
+                    ) {
+                        Text(
+                            if (selectingPhoto) "Chargement..."
+                            else "Photo",
+                            color = FeedBlue
+                        )
+                    }
+
+                    TextButton(
+                        onClick = { postFocusRequester.requestFocus() },
+                        enabled = !publishing
+                    ) {
+                        Text("Texte", color = FeedBlue)
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                publishing = true
+                                publishError = null
+                                try {
+                                    val response = SocialRepository.createPost(
                                         text = postText.trim(),
                                         photoData = photoBase64?.let {
                                             "data:image/webp;base64,$it"
@@ -255,41 +515,43 @@ fun PalRealFeedContent() {
                                         photoMimeType = photoBase64?.let { "image/webp" }
                                     )
 
-                                if (response.optBoolean("success")) {
-                                    postText = ""
-                                    selectedBitmap = null
-                                    photoBase64 = null
-                                    loadFeed()
-                                } else {
-                                    publishError = response.optString(
-                                        "message",
-                                        "La publication a échoué."
-                                    )
+                                    if (response.optBoolean("success")) {
+                                        postText = ""
+                                        selectedBitmap = null
+                                        photoBase64 = null
+                                        loadFeed()
+                                    } else {
+                                        publishError = response.optString(
+                                            "message",
+                                            "La publication a échoué."
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    publishError = e.message
+                                        ?: "Erreur lors de la publication."
+                                } finally {
+                                    publishing = false
                                 }
-                            } catch (e: Exception) {
-                                publishError = e.message
-                                    ?: "Erreur lors de la publication."
-                            } finally {
-                                publishing = false
                             }
-                        }
-                    },
-                    enabled = (postText.isNotBlank() || photoBase64 != null) && !publishing && !selectingPhoto,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = FeedBlue
-                    )
-                ) {
-                    if (publishing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
+                        },
+                        enabled = (postText.isNotBlank() || photoBase64 != null) &&
+                            !publishing && !selectingPhoto,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FeedBlue
                         )
-                    } else {
-                        Text("Publier")
+                    ) {
+                        if (publishing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Publier")
+                        }
                     }
                 }
+
             }
         }
 

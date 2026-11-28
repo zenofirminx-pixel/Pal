@@ -57,7 +57,10 @@ fun PublicProfileScreen(
                     array?.optJSONObject(it)
                 }
             } else {
-                error = "Impossible de charger ce profil."
+                val status = response.optInt("httpStatus", 0)
+                val code = response.optString("code", "UNKNOWN")
+                val message = response.optString("message", "Réponse invalide")
+                error = "Erreur profil (HTTP $status) : $code — $message"
             }
         } catch (e: Exception) {
             error = e.message ?: "Une erreur est survenue."

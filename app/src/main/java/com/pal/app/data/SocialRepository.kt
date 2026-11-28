@@ -1,6 +1,9 @@
 package com.pal.app.data
 
 import com.pal.app.data.models.PalPost
+import com.pal.app.data.models.PalUser
+import com.pal.app.data.models.PalStoryGroup
+import com.pal.app.data.models.PalStory
 import com.pal.app.network.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,6 +13,12 @@ data class FeedResult(
     val success: Boolean,
     val posts: List<PalPost>,
     val nextCursor: String?,
+    val message: String
+)
+
+data class StoriesResult(
+    val success: Boolean,
+    val groups: List<com.pal.app.data.models.PalStoryGroup>,
     val message: String
 )
 
@@ -64,6 +73,64 @@ object SocialRepository {
     suspend fun deletePost(postId: String): JSONObject =
         withContext(Dispatchers.IO) {
             ApiClient.delete("/api/social/posts/$postId")
+        }
+
+    suspend fun getStories(): StoriesResult = withContext(Dispatchers.IO) {
+        val response = ApiClient.get("/api/social/stories")
+        val array = response.optJSONArray("stories")
+        val groups = mutableListOf<PalStoryGroup>()
+
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val groupJson = array.optJSONObject(i) ?: continue
+                val authorJson = groupJson.optJSONObject("author") ?: JSONObject()
+
+                val author = PalUser(
+                    uid = authorJson.optString("uid"),
+                    firstName = authorJson.optString("firstName"),
+                    lastName = authorJson.optString("lastName"),
+                    username = authorJson.optString("username"),
+                    photoURL = authorJson.optString("photoURL"),
+                    verified = authorJson.optBoolean("verified")
+                )
+
+                val storyArray = groupJson.optJSONArray("stories")
+                val stories = mutableListOf<PalStory>()
+
+                if (storyArray != null) {
+                    for (j in 0 until storyArray.length()) {
+                        val storyJson = storyArray.optJSONObject(j) ?: continue
+                        stories.add(PalStory.fromJson(storyJson))
+                    }
+                }
+
+                if (stories.isNotEmpty()) {
+                    groups.add(PalStoryGroup(author, stories))
+                }
+            }
+        }
+
+        StoriesResult(
+            success = response.optBoolean("success"),
+            groups = groups,
+            message = response.optString("message")
+        )
+    }
+
+    suspend fun createStory(
+        photoData: String,
+        photoMimeType: String
+    ): JSONObject = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply {
+            put("photoData", photoData)
+            put("photoMimeType", photoMimeType)
+        }
+        ApiClient.post("/api/social/stories", body)
+    }
+
+    suspend fun deleteStory(storyId: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            ApiClient.delete("/api/social/stories/$storyId")
         }
 
     suspend fun likePost(postId: String): JSONObject =

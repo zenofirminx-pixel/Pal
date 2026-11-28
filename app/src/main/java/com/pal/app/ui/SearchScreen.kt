@@ -26,7 +26,7 @@ private val SearchBlue = Color(0xFF087BFF)
 private val SearchCard = Color(0xFF10141B)
 
 @Composable
-fun SearchScreen(onOpenProfile: (String) -> Unit = {}) {
+fun SearchScreen(onOpenProfile: (String) -> Unit = {}, onOpenChat: (JSONObject) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     val users = remember { mutableStateListOf<JSONObject>() }
@@ -171,7 +171,7 @@ fun SearchScreen(onOpenProfile: (String) -> Unit = {}) {
                         items = users,
                         key = { it.optString("uid") }
                     ) { user ->
-                        SearchUserItem(user, onClick = { onOpenProfile(user.optString("uid")) })
+                        SearchUserItem(user, onClick = { onOpenProfile(user.optString("uid")) }, onOpenChat = onOpenChat)
                     }
                 }
             }
@@ -180,10 +180,16 @@ fun SearchScreen(onOpenProfile: (String) -> Unit = {}) {
 }
 
 @Composable
-private fun SearchUserItem(user: JSONObject, onClick: () -> Unit) {
+private fun SearchUserItem(
+    user: JSONObject,
+    onClick: () -> Unit,
+    onOpenChat: (JSONObject) -> Unit
+) {
     val scope = rememberCoroutineScope()
     var sending by remember { mutableStateOf(false) }
-    var requestSent by remember { mutableStateOf(false) }
+    var relationship by remember(user.optString("uid")) {
+        mutableStateOf(user.optString("relationship", "none"))
+    }
     var message by remember { mutableStateOf<String?>(null) }
 
     val firstName = user.optString("firstName")
@@ -200,11 +206,11 @@ private fun SearchUserItem(user: JSONObject, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = SearchCard)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 ProfileAvatar(
-                    photoURL = user.optString("photoURL").takeIf { it.isNotBlank() && it != "null" },
+                    photoURL = user.optString("photoURL").takeIf {
+                        it.isNotBlank() && it != "null"
+                    },
                     modifier = Modifier.size(46.dp),
                     fallbackText = fullName.firstOrNull()?.uppercase() ?: "?"
                 )
@@ -217,7 +223,6 @@ private fun SearchUserItem(user: JSONObject, onClick: () -> Unit) {
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold
                     )
-
                     if (username.isNotBlank()) {
                         Text(
                             "@$username",
@@ -225,7 +230,6 @@ private fun SearchUserItem(user: JSONObject, onClick: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-
                     if (user.optBoolean("verified")) {
                         Text(
                             "Compte vérifié",
@@ -235,54 +239,74 @@ private fun SearchUserItem(user: JSONObject, onClick: () -> Unit) {
                     }
                 }
 
-                if (requestSent) {
-                    Text(
-                        "Envoyée",
-                        color = Color(0xFF8C929D),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                } else {
-                    IconButton(
-                        enabled = !sending,
-                        onClick = {
-                            scope.launch {
-                                sending = true
-                                message = null
-
-                                try {
-                                    val result = SocialRepository.sendFriendRequest(
-                                        user.optString("uid")
-                                    )
-
-                                    if (result.optBoolean("success")) {
-                                        requestSent = true
-                                    } else {
-                                        message = result.optString(
-                                            "message",
-                                            "Demande impossible."
+                when (relationship) {
+                    "none" -> {
+                        Button(
+                            enabled = !sending,
+                            onClick = {
+                                scope.launch {
+                                    sending = true
+                                    message = null
+                                    try {
+                                        val result = SocialRepository.sendFriendRequest(
+                                            user.optString("uid")
                                         )
+                                        if (result.optBoolean("success")) {
+                                            relationship = "outgoing_pending"
+                                            user.put("relationship", relationship)
+                                        } else {
+                                            message = result.optString(
+                                                "message",
+                                                "Demande impossible."
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        message = e.message ?: "Erreur de connexion."
                                     }
-                                } catch (e: Exception) {
-                                    message = e.message ?: "Erreur de connexion."
+                                    sending = false
                                 }
-
-                                sending = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SearchBlue
+                            ),
+                            contentPadding = PaddingValues(
+                                horizontal = 12.dp,
+                                vertical = 8.dp
+                            )
+                        ) {
+                            if (sending) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Ajouter comme ami")
                             }
                         }
-                    ) {
-                        if (sending) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = SearchBlue,
-                                strokeWidth = 2.dp
+                    }
+
+                    "outgoing_pending", "incoming_pending", "friends" -> {
+                        Button(
+                            onClick = { onOpenChat(user) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SearchBlue
+                            ),
+                            contentPadding = PaddingValues(
+                                horizontal = 18.dp,
+                                vertical = 8.dp
                             )
-                        } else {
-                            Icon(
-                                Icons.Default.PersonAdd,
-                                contentDescription = "Ajouter",
-                                tint = SearchBlue
-                            )
+                        ) {
+                            Text("Chat")
                         }
+                    }
+
+                    else -> {
+                        Text(
+                            "Indisponible",
+                            color = Color(0xFF8C929D),
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
                 }
             }

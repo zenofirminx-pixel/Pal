@@ -132,6 +132,10 @@ fun PalHomeScreen(onLogout: () -> Unit = {}) {
                             3 -> SearchScreen(
                                 onOpenProfile = { uid ->
                                     selectedPublicUserUid = uid
+                                },
+                                onOpenChat = { user ->
+                                    pendingChatUser = user
+                                    selectedTab = 1
                                 }
                             )
 
